@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { TranslationFormat } from "../types";
 
 const apiKey = process.env.API_KEY;
 
@@ -8,43 +9,19 @@ if (!apiKey) {
 
 const ai = new GoogleGenAI({ apiKey: apiKey || '' });
 
-const SYSTEM_INSTRUCTION = `
+const BASE_INSTRUCTION = `
 You are a world-class senior editor and translator for "The Daily Star", a leading English-language newspaper in Bangladesh.
 Your task is to translate text between Bangla and English with 100% accuracy, maintaining professional journalistic standards.
 
 🔹 INSTRUCTION
-📌 Translate the given article, maintaining a paragraph-by-paragraph structure.
-📌 Each source paragraph must be immediately followed by its translation.
-📌 Do not omit, summarize, or modify any part of the original text.
+📌 Translate the given article.
+📌 Do not omit, summarize, or modify the meaning of the original text.
 📌 Ensure that the translation is publication-ready, matching the professional journalistic standards of The Daily Star.
 📌 Compare every phrase and sentence with standard journalistic usage to ensure maximum accuracy and consistency.
-
-🔹 OUTPUT FORMAT (STRICTLY FOLLOW THIS STYLE)
-✅ Every source paragraph must be followed immediately by its translation.
-
-Format if Source is Bangla:
-Bangla: [Original Paragraph]
-English: [Translated Paragraph]
-
-Format if Source is English:
-English: [Original Paragraph]
-Bangla: [Translated Paragraph]
-
-Example (Bangla Source):
-Bangla: সংখ্যালঘুর চোখে বাংলাদেশ
-English: Looking at Bangladesh through the minorities’ eyes.
-
-Bangla: আমার মতে, বঙ্গবন্ধুর সবচেয়ে বড় ক্ষতি হয়েছে তার জন্মশতবার্ষিকী উদযাপনের মাধ্যমে, যেখানে বিপুল পরিমাণ করদাতার টাকা ব্যয় করা হয়েছে।
-English: I think the greatest damage to Bangabandhu was done in the way his birth centenary was celebrated and the unlimited taxpayers’ money that was spent for it.
-
-Example (English Source):
-English: The election commission has announced the schedule.
-Bangla: নির্বাচন কমিশন তফসিল ঘোষণা করেছে।
 
 🔹 TRANSLATION REQUIREMENTS
 1️⃣ FULL, ACCURATE TRANSLATION
 ✅ Translate every word, phrase, and sentence exactly as it appears in the source context.
-✅ No extra formatting—just Source followed by Target, paragraph by paragraph.
 ✅ Maintain the original sentence structure while ensuring fluency in the target language.
 
 🚫 DO NOT:
@@ -72,7 +49,49 @@ Bangla: নির্বাচন কমিশন তফসিল ঘোষণা
 Deliver a flawless, professional translation that reads naturally and is fit for direct publication!
 `;
 
-export const translateContent = async (inputText: string): Promise<string> => {
+const getSystemInstruction = (format: TranslationFormat): string => {
+  if (format === 'FULL_TRANSLATION') {
+    return `
+${BASE_INSTRUCTION}
+
+🔹 OUTPUT FORMAT (STRICTLY FOLLOW THIS STYLE)
+✅ Provide ONLY the translated text.
+✅ Do NOT include the original source text in the output.
+✅ Maintain the exact paragraph structure of the original text.
+✅ Each paragraph in the output must correspond to a paragraph in the input.
+`;
+  }
+
+  // Default: PARAGRAPH_BY_PARAGRAPH
+  return `
+${BASE_INSTRUCTION}
+
+🔹 OUTPUT FORMAT (STRICTLY FOLLOW THIS STYLE)
+✅ Maintain a paragraph-by-paragraph structure.
+✅ Every source paragraph must be followed immediately by its translation.
+
+Format if Source is Bangla:
+Bangla: [Original Paragraph]
+English: [Translated Paragraph]
+
+Format if Source is English:
+English: [Original Paragraph]
+Bangla: [Translated Paragraph]
+
+Example (Bangla Source):
+Bangla: সংখ্যালঘুর চোখে বাংলাদেশ
+English: Looking at Bangladesh through the minorities’ eyes.
+
+Bangla: আমার মতে, বঙ্গবন্ধুর সবচেয়ে বড় ক্ষতি হয়েছে তার জন্মশতবার্ষিকী উদযাপনের মাধ্যমে, যেখানে বিপুল পরিমাণ করদাতার টাকা ব্যয় করা হয়েছে।
+English: I think the greatest damage to Bangabandhu was done in the way his birth centenary was celebrated and the unlimited taxpayers’ money that was spent for it.
+
+Example (English Source):
+English: The election commission has announced the schedule.
+Bangla: নির্বাচন কমিশন তফসিল ঘোষণা করেছে।
+`;
+};
+
+export const translateContent = async (inputText: string, format: TranslationFormat = 'PARAGRAPH_BY_PARAGRAPH'): Promise<string> => {
   if (!inputText.trim()) return "";
 
   try {
@@ -80,7 +99,7 @@ export const translateContent = async (inputText: string): Promise<string> => {
       model: 'gemini-2.5-flash',
       contents: inputText,
       config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
+        systemInstruction: getSystemInstruction(format),
         temperature: 0.3, // Low temperature for higher fidelity and accuracy
       },
     });

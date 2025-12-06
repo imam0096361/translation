@@ -11,3 +11,5 @@ export interface TranslationResult {
 }
 
 export type TranslationMode = 'BANGLA_TO_ENGLISH' | 'ENGLISH_TO_BANGLA';
+
+export type TranslationFormat = 'PARAGRAPH_BY_PARAGRAPH' | 'FULL_TRANSLATION';

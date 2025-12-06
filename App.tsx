@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { translateContent } from './services/gemini';
-import { TranslationStatus } from './types';
+import { TranslationStatus, TranslationFormat } from './types';
 import { IconTranslate, IconArrowRight, IconCopy, IconCheck, IconRotate, IconMaximize, IconMinimize } from './components/Icons';
 
 const LOCAL_STORAGE_KEY = 'daily_star_translator_draft';
@@ -21,6 +21,7 @@ const App: React.FC = () => {
   const [status, setStatus] = useState<TranslationStatus>(TranslationStatus.IDLE);
   const [copied, setCopied] = useState(false);
   const [isFocusMode, setIsFocusMode] = useState(false);
+  const [format, setFormat] = useState<TranslationFormat>('PARAGRAPH_BY_PARAGRAPH');
 
   // Auto-save effect
   useEffect(() => {
@@ -38,7 +39,7 @@ const App: React.FC = () => {
     setOutputText('');
 
     try {
-      const result = await translateContent(inputText);
+      const result = await translateContent(inputText, format);
       setOutputText(result);
       setStatus(TranslationStatus.SUCCESS);
     } catch (error) {
@@ -76,19 +77,17 @@ const App: React.FC = () => {
       {!isFocusMode && (
         <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
           <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-ds-green rounded-lg flex items-center justify-center text-white">
-                <IconTranslate />
+            <div className="flex items-center gap-4">
+              <div className="flex flex-col">
+                <span className="text-3xl font-bold font-serif text-ds-green leading-none tracking-tight">The Daily Star</span>
               </div>
-              <div>
-                <h1 className="text-xl font-bold font-serif text-ds-black leading-tight">Daily Star Translator</h1>
-                <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Editorial Edition</p>
+              <div className="h-8 w-px bg-gray-300 hidden sm:block"></div>
+              <div className="flex flex-col justify-center">
+                <h1 className="text-xl font-bold font-serif text-ds-black leading-none tracking-tight">Translator</h1>
+                <p className="text-[10px] text-ds-green uppercase tracking-widest font-bold mt-0.5">Editorial Edition</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <div className="hidden sm:block text-xs font-medium text-gray-400 bg-gray-100 px-3 py-1 rounded-full">
-                Powered by Gemini 2.5
-              </div>
               <button 
                 onClick={toggleFocusMode}
                 className="text-gray-500 hover:text-ds-green p-2 rounded-lg hover:bg-gray-100 transition-colors"
@@ -127,24 +126,34 @@ const App: React.FC = () => {
         {/* Input Section */}
         <div className="flex-1 flex flex-col gap-4">
           <div className={`bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col transition-all duration-500 ${isFocusMode ? 'h-full' : 'h-[calc(100vh-12rem)] min-h-[500px]'}`}>
-            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center shrink-0">
+            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex flex-wrap gap-2 justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
-                <span className="text-sm font-semibold text-gray-600">Source Text (Bangla/English)</span>
+                <span className="text-sm font-semibold text-gray-600">Source Text</span>
                 <span className="text-xs font-medium text-gray-500 bg-gray-200/60 px-2 py-0.5 rounded-md tabular-nums">{inputText.length.toLocaleString()} chars</span>
               </div>
-              {inputText && (
-                <button 
-                  onClick={handleClear}
-                  className="text-xs text-gray-500 hover:text-red-600 transition-colors flex items-center gap-1 font-medium"
+              <div className="flex items-center gap-3">
+                 <select 
+                  value={format}
+                  onChange={(e) => setFormat(e.target.value as TranslationFormat)}
+                  className="text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-ds-green cursor-pointer hover:border-ds-green transition-colors"
                 >
-                  <IconRotate /> Reset
-                </button>
-              )}
+                  <option value="PARAGRAPH_BY_PARAGRAPH">Paragraph by Paragraph</option>
+                  <option value="FULL_TRANSLATION">Full Translation</option>
+                </select>
+                {inputText && (
+                  <button 
+                    onClick={handleClear}
+                    className="text-xs text-gray-500 hover:text-red-600 transition-colors flex items-center gap-1 font-medium ml-2"
+                  >
+                    <IconRotate /> Reset
+                  </button>
+                )}
+              </div>
             </div>
             <textarea
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder="Paste your article here. The tool will translate it paragraph-by-paragraph, strictly adhering to The Daily Star's editorial style and idiomatic expressions..."
+              placeholder="Paste your article here. The tool will translate it strictly adhering to The Daily Star's editorial style and idiomatic expressions..."
               className="flex-1 w-full p-6 resize-none focus:outline-none text-lg leading-relaxed font-serif text-gray-800 placeholder-gray-300"
               spellCheck={false}
             />
