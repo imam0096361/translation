@@ -1,46 +1,70 @@
-import React, { useState, useEffect } from 'react';
-import { translateContent } from './services/gemini';
-import { TranslationStatus, TranslationFormat } from './types';
-import { IconTranslate, IconArrowRight, IconCopy, IconCheck, IconRotate, IconMaximize, IconMinimize } from './components/Icons';
+import React, { useState, useEffect, useRef } from 'react';
+import { translateContentStream } from './services/gemini';
+import { TranslationStatus, TranslationFormat, ModelTier, GlossaryEntry } from './types';
+import { IconArrowRight, IconCopy, IconCheck, IconRotate, IconMaximize, IconMinimize, IconSettings, IconTranslate } from './components/Icons';
+import { GlossaryModal } from './components/GlossaryModal';
 
-const LOCAL_STORAGE_KEY = 'daily_star_translator_draft';
+const INPUT_STORAGE_KEY = 'daily_star_translator_input';
+const OUTPUT_STORAGE_KEY = 'daily_star_translator_output';
+const GLOSSARY_STORAGE_KEY = 'daily_star_translator_glossary';
 
 const App: React.FC = () => {
-  // Initialize state from localStorage if available
+  // State initialization
   const [inputText, setInputText] = useState(() => {
     try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-      return saved || '';
-    } catch (e) {
-      console.warn('LocalStorage access denied', e);
-      return '';
-    }
+      return localStorage.getItem(INPUT_STORAGE_KEY) || '';
+    } catch { return ''; }
   });
   
-  const [outputText, setOutputText] = useState('');
+  const [outputText, setOutputText] = useState(() => {
+    try {
+      return localStorage.getItem(OUTPUT_STORAGE_KEY) || '';
+    } catch { return ''; }
+  });
+
   const [status, setStatus] = useState<TranslationStatus>(TranslationStatus.IDLE);
   const [copied, setCopied] = useState(false);
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [format, setFormat] = useState<TranslationFormat>('PARAGRAPH_BY_PARAGRAPH');
-
-  // Auto-save effect
-  useEffect(() => {
+  const [modelTier, setModelTier] = useState<ModelTier>('FAST');
+  const [glossary, setGlossary] = useState<GlossaryEntry[]>(() => {
     try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, inputText);
-    } catch (e) {
-      // Ignore write errors (e.g. storage full or disabled)
-    }
+      const saved = localStorage.getItem(GLOSSARY_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+  const [isGlossaryOpen, setIsGlossaryOpen] = useState(false);
+
+  // Persistence Effects
+  useEffect(() => {
+    try { localStorage.setItem(INPUT_STORAGE_KEY, inputText); } catch {}
   }, [inputText]);
+
+  useEffect(() => {
+    try { localStorage.setItem(OUTPUT_STORAGE_KEY, outputText); } catch {}
+  }, [outputText]);
+
+  useEffect(() => {
+    try { localStorage.setItem(GLOSSARY_STORAGE_KEY, JSON.stringify(glossary)); } catch {}
+  }, [glossary]);
 
   const handleTranslate = async () => {
     if (!inputText.trim()) return;
 
-    setStatus(TranslationStatus.LOADING);
+    setStatus(TranslationStatus.STREAMING);
     setOutputText('');
 
     try {
-      const result = await translateContent(inputText, format);
-      setOutputText(result);
+      // Use the streaming service
+      await translateContentStream(
+        inputText, 
+        format, 
+        modelTier, 
+        glossary,
+        (chunk) => {
+          setOutputText(prev => prev + chunk);
+        }
+      );
       setStatus(TranslationStatus.SUCCESS);
     } catch (error) {
       console.error(error);
@@ -59,27 +83,35 @@ const App: React.FC = () => {
     setInputText('');
     setOutputText('');
     setStatus(TranslationStatus.IDLE);
-    try {
-      localStorage.removeItem(LOCAL_STORAGE_KEY);
-    } catch (e) {
-      // Ignore
-    }
+    try { 
+      localStorage.removeItem(INPUT_STORAGE_KEY); 
+      localStorage.removeItem(OUTPUT_STORAGE_KEY);
+    } catch {}
   };
 
-  const toggleFocusMode = () => {
-    setIsFocusMode(!isFocusMode);
-  };
+  const toggleFocusMode = () => setIsFocusMode(!isFocusMode);
 
   return (
     <div className={`min-h-screen flex flex-col font-sans bg-[#F4F4F4] transition-colors duration-300 ${isFocusMode ? 'bg-[#fcfcfc]' : ''}`}>
       
+      <GlossaryModal 
+        isOpen={isGlossaryOpen} 
+        onClose={() => setIsGlossaryOpen(false)} 
+        glossary={glossary} 
+        setGlossary={setGlossary} 
+      />
+
       {/* Header */}
       {!isFocusMode && (
-        <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
-          <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+        <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+          <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="flex flex-col">
-                <span className="text-3xl font-bold font-serif text-ds-green leading-none tracking-tight">The Daily Star</span>
+                <img 
+                  src="https://upload.wikimedia.org/wikipedia/commons/1/1a/Logo_of_The_Daily_Star.svg" 
+                  alt="The Daily Star" 
+                  className="h-10 w-auto object-contain"
+                />
               </div>
               <div className="h-8 w-px bg-gray-300 hidden sm:block"></div>
               <div className="flex flex-col justify-center">
@@ -108,9 +140,6 @@ const App: React.FC = () => {
           title="Exit Focus Mode"
         >
           <IconMinimize />
-          <span className="absolute right-full mr-2 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-            Exit Focus
-          </span>
         </button>
       )}
 
@@ -119,58 +148,91 @@ const App: React.FC = () => {
         className={`flex-1 flex flex-col lg:flex-row gap-6 mx-auto transition-all duration-500 w-full
           ${isFocusMode 
             ? 'max-w-[98%] px-4 py-4 h-screen' 
-            : 'max-w-5xl px-4 py-8'
+            : 'max-w-6xl px-4 py-8'
           }`}
       >
         
         {/* Input Section */}
         <div className="flex-1 flex flex-col gap-4">
-          <div className={`bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col transition-all duration-500 ${isFocusMode ? 'h-full' : 'h-[calc(100vh-12rem)] min-h-[500px]'}`}>
+          <div className={`bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col transition-all duration-500 ${isFocusMode ? 'h-full' : 'h-[calc(100vh-12rem)] min-h-[600px]'}`}>
+            
+            {/* Input Toolbar */}
             <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex flex-wrap gap-2 justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
                 <span className="text-sm font-semibold text-gray-600">Source Text</span>
                 <span className="text-xs font-medium text-gray-500 bg-gray-200/60 px-2 py-0.5 rounded-md tabular-nums">{inputText.length.toLocaleString()} chars</span>
               </div>
-              <div className="flex items-center gap-3">
-                 <select 
+              
+              <div className="flex items-center gap-2">
+                {/* Format Selector */}
+                <select 
                   value={format}
                   onChange={(e) => setFormat(e.target.value as TranslationFormat)}
-                  className="text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-ds-green cursor-pointer hover:border-ds-green transition-colors"
+                  className="text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-ds-green cursor-pointer hover:border-ds-green transition-colors"
                 >
                   <option value="PARAGRAPH_BY_PARAGRAPH">Paragraph by Paragraph</option>
-                  <option value="FULL_TRANSLATION">Full Translation</option>
+                  <option value="FULL_TRANSLATION">Full Article Flow</option>
                 </select>
+
+                {/* Model Tier Selector */}
+                <div className="flex bg-gray-200 rounded-md p-0.5 text-xs font-medium">
+                  <button
+                    onClick={() => setModelTier('FAST')}
+                    className={`px-3 py-1 rounded-sm transition-all ${modelTier === 'FAST' ? 'bg-white text-ds-black shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                    Quick
+                  </button>
+                  <button
+                    onClick={() => setModelTier('DEEP_EDITORIAL')}
+                    className={`px-3 py-1 rounded-sm transition-all flex items-center gap-1 ${modelTier === 'DEEP_EDITORIAL' ? 'bg-ds-green text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                    Deep
+                  </button>
+                </div>
+
+                {/* Glossary Button */}
+                <button
+                  onClick={() => setIsGlossaryOpen(true)}
+                  className={`p-1.5 rounded-md border transition-colors flex items-center gap-1 text-xs font-medium ${glossary.length > 0 ? 'bg-ds-green/10 text-ds-green border-ds-green/20' : 'bg-white border-gray-300 text-gray-600 hover:border-gray-400'}`}
+                  title="Manage Glossary"
+                >
+                  <IconSettings /> Glossary {glossary.length > 0 && `(${glossary.length})`}
+                </button>
+
                 {inputText && (
                   <button 
                     onClick={handleClear}
-                    className="text-xs text-gray-500 hover:text-red-600 transition-colors flex items-center gap-1 font-medium ml-2"
+                    className="text-xs text-gray-500 hover:text-red-600 transition-colors p-1.5"
+                    title="Clear Text"
                   >
-                    <IconRotate /> Reset
+                    <IconRotate />
                   </button>
                 )}
               </div>
             </div>
+
             <textarea
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder="Paste your article here. The tool will translate it strictly adhering to The Daily Star's editorial style and idiomatic expressions..."
+              placeholder="Paste your article here. The tool will translate it strictly adhering to The Daily Star's editorial style, customized glossary, and idiomatic expressions..."
               className="flex-1 w-full p-6 resize-none focus:outline-none text-lg leading-relaxed font-serif text-gray-800 placeholder-gray-300"
               spellCheck={false}
             />
+            
             <div className="p-4 bg-white border-t border-gray-100 shrink-0">
               <button
                 onClick={handleTranslate}
-                disabled={status === TranslationStatus.LOADING || !inputText.trim()}
+                disabled={status === TranslationStatus.LOADING || status === TranslationStatus.STREAMING || !inputText.trim()}
                 className={`w-full py-3 px-6 rounded-lg text-white font-medium text-lg shadow-sm transition-all flex items-center justify-center gap-2
-                  ${status === TranslationStatus.LOADING || !inputText.trim()
+                  ${status === TranslationStatus.LOADING || status === TranslationStatus.STREAMING || !inputText.trim()
                     ? 'bg-gray-300 cursor-not-allowed' 
                     : 'bg-ds-black hover:bg-ds-green active:scale-[0.99]'
                   }`}
               >
-                {status === TranslationStatus.LOADING ? (
+                {status === TranslationStatus.LOADING || status === TranslationStatus.STREAMING ? (
                   <>
                     <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                    Translating...
+                    {status === TranslationStatus.STREAMING ? 'Writing...' : 'Translating...'}
                   </>
                 ) : (
                   <>
@@ -184,7 +246,7 @@ const App: React.FC = () => {
 
         {/* Output Section */}
         <div className="flex-1 flex flex-col gap-4">
-          <div className={`bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col transition-all duration-500 ${isFocusMode ? 'h-full' : 'h-[calc(100vh-12rem)] min-h-[500px]'}`}>
+          <div className={`bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col transition-all duration-500 ${isFocusMode ? 'h-full' : 'h-[calc(100vh-12rem)] min-h-[600px]'}`}>
             <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
                 <span className="text-sm font-semibold text-gray-600">Journalistic Output</span>
@@ -205,29 +267,24 @@ const App: React.FC = () => {
               {status === TranslationStatus.ERROR ? (
                 <div className="h-full flex flex-col items-center justify-center text-red-500 text-center p-6">
                   <p className="font-semibold text-lg mb-2">Translation Failed</p>
-                  <p className="text-sm opacity-80">Please check your internet connection or API key and try again.</p>
+                  <p className="text-sm opacity-80">Please check your internet connection or API key.</p>
                 </div>
-              ) : !outputText && status !== TranslationStatus.LOADING ? (
+              ) : !outputText && status !== TranslationStatus.LOADING && status !== TranslationStatus.STREAMING ? (
                 <div className="h-full flex flex-col items-center justify-center text-gray-300 text-center p-6 select-none">
                   <div className="w-16 h-16 mb-4 rounded-full bg-gray-100 flex items-center justify-center text-gray-300">
                     <IconTranslate />
                   </div>
                   <p className="font-serif text-xl mb-2">Ready to Translate</p>
-                  <p className="text-sm font-sans max-w-xs mx-auto">Paste an article from The Daily Star (Bangla or English) to get a professionally formatted translation.</p>
+                  <p className="text-sm font-sans max-w-xs mx-auto mb-4">Paste an article from The Daily Star to get a professionally formatted translation.</p>
+                  <div className="text-xs text-gray-400 bg-gray-50 px-3 py-2 rounded-lg border border-gray-100">
+                    <span className="font-semibold text-ds-green">Pro Tip:</span> Use "Deep" mode for editorials.
+                  </div>
                 </div>
               ) : (
                 <div className="prose prose-lg max-w-none font-serif text-gray-800 leading-8 whitespace-pre-wrap">
-                  {status === TranslationStatus.LOADING && !outputText ? (
-                     <div className="animate-pulse space-y-4">
-                       <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                       <div className="h-4 bg-gray-200 rounded w-full"></div>
-                       <div className="h-4 bg-gray-200 rounded w-5/6"></div>
-                       <div className="h-8 bg-transparent"></div>
-                       <div className="h-4 bg-gray-200 rounded w-2/3"></div>
-                       <div className="h-4 bg-gray-200 rounded w-full"></div>
-                     </div>
-                  ) : (
-                    outputText
+                  {outputText}
+                  {(status === TranslationStatus.LOADING || status === TranslationStatus.STREAMING) && (
+                     <span className="inline-block w-2 h-5 ml-1 bg-ds-green animate-pulse align-middle"></span>
                   )}
                 </div>
               )}
@@ -240,7 +297,7 @@ const App: React.FC = () => {
       {/* Footer */}
       {!isFocusMode && (
         <footer className="bg-white border-t border-gray-200 py-6 mt-auto">
-          <div className="max-w-5xl mx-auto px-4 text-center text-gray-400 text-sm font-sans">
+          <div className="max-w-6xl mx-auto px-4 text-center text-gray-400 text-sm font-sans">
             &copy; {new Date().getFullYear()} Daily Star Editorial Tools. Strict Confidentiality Maintained.
           </div>
         </footer>
