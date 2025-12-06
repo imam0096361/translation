@@ -1,14 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { translateContent } from './services/gemini';
 import { TranslationStatus } from './types';
 import { IconTranslate, IconArrowRight, IconCopy, IconCheck, IconRotate, IconMaximize, IconMinimize } from './components/Icons';
 
+const LOCAL_STORAGE_KEY = 'daily_star_translator_draft';
+
 const App: React.FC = () => {
-  const [inputText, setInputText] = useState('');
+  // Initialize state from localStorage if available
+  const [inputText, setInputText] = useState(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+      return saved || '';
+    } catch (e) {
+      console.warn('LocalStorage access denied', e);
+      return '';
+    }
+  });
+  
   const [outputText, setOutputText] = useState('');
   const [status, setStatus] = useState<TranslationStatus>(TranslationStatus.IDLE);
   const [copied, setCopied] = useState(false);
   const [isFocusMode, setIsFocusMode] = useState(false);
+
+  // Auto-save effect
+  useEffect(() => {
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY, inputText);
+    } catch (e) {
+      // Ignore write errors (e.g. storage full or disabled)
+    }
+  }, [inputText]);
 
   const handleTranslate = async () => {
     if (!inputText.trim()) return;
@@ -37,6 +58,11 @@ const App: React.FC = () => {
     setInputText('');
     setOutputText('');
     setStatus(TranslationStatus.IDLE);
+    try {
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
+    } catch (e) {
+      // Ignore
+    }
   };
 
   const toggleFocusMode = () => {
