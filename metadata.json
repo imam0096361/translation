@@ -1,0 +1,5 @@
+{
+  "name": "Daily Star Style Translator",
+  "description": "A professional journalistic translation tool leveraging Gemini 2.5 to translate between Bangla and English, adhering strictly to The Daily Star's editorial standards and formatting guidelines.",
+  "requestFramePermissions": []
+}
