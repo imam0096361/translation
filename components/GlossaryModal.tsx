@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { GlossaryEntry } from '../types';
 import { IconPlus, IconTrash } from './Icons';
