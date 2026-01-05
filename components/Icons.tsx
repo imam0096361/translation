@@ -99,3 +99,34 @@ export const IconHistory = () => (
     <polyline points="12 6 12 12 16 14" />
   </svg>
 );
+
+export const IconBolt = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+  </svg>
+);
+
+export const IconBrain = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9.5 2A5 5 0 0 1 12 4a5 5 0 0 1 2.5-2 4.5 4.5 0 0 1 0 9 4.5 4.5 0 0 1-5 0 4.5 4.5 0 0 1 0-9Z" />
+    <path d="M12 14v7" />
+    <path d="M9 22h6" />
+  </svg>
+);
+
+export const IconNews = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2" />
+    <path d="M18 14h-8" />
+    <path d="M15 18h-5" />
+    <path d="M10 6h8v4h-8V6Z" />
+  </svg>
+);
+
+export const IconFeather = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5l6.74-6.76Z" />
+    <line x1="16" y1="8" x2="2" y2="22" />
+    <line x1="17.5" y1="15" x2="9" y2="15" />
+  </svg>
+);

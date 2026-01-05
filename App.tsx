@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { translateContentStream, detectLanguage } from './services/gemini';
 import { getAllHistory, saveHistoryItem, deleteHistoryItem, clearHistory } from './services/db';
 import { TranslationStatus, TranslationFormat, ModelTier, GlossaryEntry, ContentType, Language, HistoryItem } from './types';
-import { IconArrowRight, IconCopy, IconCheck, IconRotate, IconMaximize, IconMinimize, IconSettings, IconTranslate, IconThumbsUp, IconThumbsDown, IconHistory } from './components/Icons';
+import { IconArrowRight, IconCopy, IconCheck, IconRotate, IconMaximize, IconMinimize, IconSettings, IconTranslate, IconThumbsUp, IconThumbsDown, IconHistory, IconBolt, IconBrain, IconNews, IconFeather } from './components/Icons';
 import { GlossaryModal } from './components/GlossaryModal';
 import { HistoryModal } from './components/HistoryModal';
 
@@ -48,11 +48,11 @@ const App: React.FC = () => {
   
   const [format, setFormat] = useState<TranslationFormat>(() => {
     try {
-      return (localStorage.getItem(FORMAT_STORAGE_KEY) as TranslationFormat) || 'PARAGRAPH_BY_PARAGRAPH';
-    } catch { return 'PARAGRAPH_BY_PARAGRAPH'; }
+      return (localStorage.getItem(FORMAT_STORAGE_KEY) as TranslationFormat) || 'FULL_TRANSLATION';
+    } catch { return 'FULL_TRANSLATION'; }
   });
 
-  const [modelTier, setModelTier] = useState<ModelTier>('DEEP_EDITORIAL');
+  const [modelTier, setModelTier] = useState<ModelTier>('FAST');
   const [contentType, setContentType] = useState<ContentType>('HARD_NEWS');
   const [glossary, setGlossary] = useState<GlossaryEntry[]>(() => {
     try {
@@ -312,7 +312,7 @@ const App: React.FC = () => {
               </div>
               
               <div className="flex items-center gap-3 flex-wrap">
-                <div className="flex items-center bg-gray-200/50 rounded-md p-0.5 border border-gray-200 shadow-inner">
+                <div className="flex items-center bg-gray-200/50 rounded-md p-0.5 border border-gray-200 shadow-inner group">
                   <button 
                     onClick={() => setFormat('PARAGRAPH_BY_PARAGRAPH')} 
                     className={`px-3 py-1 text-[10px] font-black rounded-sm transition-all uppercase tracking-tighter ${format === 'PARAGRAPH_BY_PARAGRAPH' ? 'bg-white text-ds-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
@@ -329,14 +329,44 @@ const App: React.FC = () => {
 
                 {!isFocusMode && (
                   <>
-                    <div className="flex items-center bg-gray-200/50 rounded-md p-0.5 border border-gray-200">
-                      <button onClick={() => setContentType('HARD_NEWS')} className={`px-3 py-1 text-[10px] font-bold rounded-sm transition-all uppercase ${contentType === 'HARD_NEWS' ? 'bg-white text-ds-black shadow-sm' : 'text-gray-400'}`}>News</button>
-                      <button onClick={() => setContentType('OP_ED')} className={`px-3 py-1 text-[10px] font-bold rounded-sm transition-all uppercase ${contentType === 'OP_ED' ? 'bg-white text-ds-green shadow-sm' : 'text-gray-400'}`}>Op-Ed</button>
+                    {/* Content Type Selector */}
+                    <div className="flex items-center bg-gray-200/50 rounded-md p-0.5 border border-gray-200 shadow-sm">
+                      <button 
+                        onClick={() => setContentType('HARD_NEWS')} 
+                        className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold rounded-sm transition-all uppercase ${contentType === 'HARD_NEWS' ? 'bg-white text-ds-black shadow-sm' : 'text-gray-400 hover:text-gray-500'}`}
+                        title="Hard News Style"
+                      >
+                        <IconNews />
+                        <span>News</span>
+                      </button>
+                      <button 
+                        onClick={() => setContentType('OP_ED')} 
+                        className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold rounded-sm transition-all uppercase ${contentType === 'OP_ED' ? 'bg-white text-ds-green shadow-sm' : 'text-gray-400 hover:text-gray-500'}`}
+                        title="Opinion Editorial Style"
+                      >
+                        <IconFeather />
+                        <span>Op-Ed</span>
+                      </button>
                     </div>
 
-                    <div className="flex bg-gray-200/50 rounded-md p-0.5 border border-gray-200">
-                      <button onClick={() => setModelTier('FAST')} className={`px-3 py-1 text-[10px] font-bold rounded-sm transition-all uppercase ${modelTier === 'FAST' ? 'bg-white text-ds-black shadow-sm' : 'text-gray-400'}`}>Fast</button>
-                      <button onClick={() => setModelTier('DEEP_EDITORIAL')} className={`px-3 py-1 text-[10px] font-bold rounded-sm transition-all uppercase ${modelTier === 'DEEP_EDITORIAL' ? 'bg-ds-green text-white shadow-sm' : 'text-gray-400'}`}>Deep</button>
+                    {/* Model Tier Selector */}
+                    <div className="flex items-center bg-gray-200/50 rounded-md p-0.5 border border-gray-200 shadow-sm">
+                      <button 
+                        onClick={() => setModelTier('FAST')} 
+                        className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold rounded-sm transition-all uppercase ${modelTier === 'FAST' ? 'bg-white text-ds-black shadow-sm' : 'text-gray-400 hover:text-gray-500'}`}
+                        title="Fast Translation (Flash)"
+                      >
+                        <IconBolt />
+                        <span>Fast</span>
+                      </button>
+                      <button 
+                        onClick={() => setModelTier('DEEP_EDITORIAL')} 
+                        className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold rounded-sm transition-all uppercase ${modelTier === 'DEEP_EDITORIAL' ? 'bg-ds-green text-white shadow-sm' : 'text-gray-400 hover:text-gray-500'}`}
+                        title="Deep Editorial Quality (Pro)"
+                      >
+                        <IconBrain />
+                        <span>Deep</span>
+                      </button>
                     </div>
                   </>
                 )}

@@ -6,26 +6,77 @@ import { TranslationFormat, ModelTier, GlossaryEntry, ContentType, Language } fr
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 /**
- * Client-side language detection logic focused on Bangla vs English.
- * Uses Unicode script range analysis for high speed and reliability.
+ * Robust client-side language detection focusing on Bangla vs English.
+ * Uses a combination of stopword analysis, word-level script dominance,
+ * and character range heuristics.
  */
 export const detectLanguage = (text: string): Language => {
   if (!text || text.trim().length < 2) return 'UNKNOWN';
 
-  // Bangla Unicode range: 0980–09FF
-  const banglaRegex = /[\u0980-\u09FF]/g;
-  const englishRegex = /[a-zA-Z]/g;
+  const normalized = text.toLowerCase();
+  const words = normalized.split(/\s+/).filter(w => w.length > 0);
+  
+  if (words.length === 0) return 'UNKNOWN';
 
-  const banglaMatches = text.match(banglaRegex) || [];
-  const englishMatches = text.match(englishRegex) || [];
+  let banglaScore = 0;
+  let englishScore = 0;
 
-  if (banglaMatches.length > englishMatches.length) {
-    return 'BANGLA';
-  } else if (englishMatches.length > 0) {
-    return 'ENGLISH';
+  // High-frequency functional words (stopwords)
+  const banglaStopwords = new Set(['এবং', 'ও', 'কিন্তু', 'যদি', 'তবে', 'জন্য', 'থেকে', 'করা', 'হয়', 'করে', 'ছিল', 'আছে', 'আমি', 'তুমি', 'সে', 'এই', 'সেই', 'তার', 'কে']);
+  const englishStopwords = new Set(['the', 'and', 'is', 'of', 'in', 'to', 'for', 'it', 'on', 'with', 'as', 'at', 'by', 'this', 'that', 'was', 'were', 'from', 'an', 'be']);
+
+  const banglaCharRegex = /[\u0980-\u09FF]/;
+  const englishCharRegex = /[a-z]/;
+
+  words.forEach(word => {
+    // 1. Stopword check (Very high confidence)
+    if (banglaStopwords.has(word)) {
+      banglaScore += 10;
+    }
+    if (englishStopwords.has(word)) {
+      englishScore += 10;
+    }
+
+    // 2. Word-level script analysis
+    const hasBangla = banglaCharRegex.test(word);
+    const hasEnglish = englishCharRegex.test(word);
+
+    if (hasBangla && !hasEnglish) {
+      banglaScore += 2;
+    } else if (hasEnglish && !hasBangla) {
+      englishScore += 2;
+    } else if (hasBangla && hasEnglish) {
+      // Mixed word (e.g. "Tk-এর") - count actual characters
+      const bCount = (word.match(/[\u0980-\u09FF]/g) || []).length;
+      const eCount = (word.match(/[a-z]/g) || []).length;
+      if (bCount > eCount) banglaScore += 1;
+      else if (eCount > bCount) englishScore += 1;
+    }
+  });
+
+  // 3. Fallback to raw character density if scores are tied or zero
+  if (banglaScore === englishScore) {
+    const banglaChars = (text.match(/[\u0980-\u09FF]/g) || []).length;
+    const englishChars = (text.match(/[a-zA-Z]/g) || []).length;
+    
+    if (banglaChars > englishChars) return 'BANGLA';
+    if (englishChars > banglaChars) return 'ENGLISH';
+    return 'UNKNOWN';
   }
 
-  return 'UNKNOWN';
+  // Use a dominance threshold to avoid false positives on mixed text
+  const ratio = banglaScore > englishScore 
+    ? banglaScore / (englishScore || 1) 
+    : englishScore / (banglaScore || 1);
+
+  if (ratio < 1.2 && words.length > 5) {
+    // If it's very close in a long text, fallback to character count as tie-breaker
+    const banglaChars = (text.match(/[\u0980-\u09FF]/g) || []).length;
+    const englishChars = (text.match(/[a-zA-Z]/g) || []).length;
+    return banglaChars > englishChars ? 'BANGLA' : 'ENGLISH';
+  }
+
+  return banglaScore > englishScore ? 'BANGLA' : 'ENGLISH';
 };
 
 const getSystemInstruction = (
@@ -50,6 +101,7 @@ const getSystemInstruction = (
 2. **NO CHATTING**: Output the result and nothing else.
 3. **HOUSE STYLE**: Use British English (organisation, centre). Use "Tk" for Taka.
 4. **NATURALIZATION**: Ensure the English (or Bangla) sounds native, not like a direct literal translation.
+${modelTier === 'DEEP_EDITORIAL' ? '5. **AP STYLE ADHERENCE**: Follow Associated Press (AP) style guidelines for structural precision, journalistic clarity, and professional formatting, while strictly maintaining British spelling for individual words.' : ''}
   `;
 
   const modeInstruction = format === 'FULL_TRANSLATION' 
